@@ -1,6 +1,6 @@
 import { Button, Input, YStack, H2 } from 'tamagui'
 import { useState } from 'react'
-import { updateProfile } from '../auth/auth-service'
+import { updateProfile } from '../../services/auth-service'
 
 export function ProfileSetupScreen({ onComplete }) {
   const [profile, setProfile] = useState({ firstName: '', lastName: '', birthDate: '', class: '' })

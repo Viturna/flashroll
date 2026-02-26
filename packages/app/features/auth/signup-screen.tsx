@@ -1,6 +1,6 @@
 import { Button, Input, YStack, Text } from 'tamagui'
 import { useState } from 'react'
-import { signUp } from './auth-service'
+import { signUp } from '../../services/auth-service'
 
 export function SignUpScreen({ onNext }) {
   const [form, setForm] = useState({ email: '', password: '' })

@@ -4,6 +4,15 @@
       "eas": {
         "projectId": "ce20e35c-68d5-4dc6-8c34-ccacba4aeb52"
       }
+    },
+    "android": {
+      "package": "com.thomasriq.flashroll"
+    },
+    "ios": {
+      "bundleIdentifier": "com.thomasriq.flashroll",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     }
   }
 }

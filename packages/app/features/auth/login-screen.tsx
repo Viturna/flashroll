@@ -1,8 +1,10 @@
 import { Button, Input, YStack, Text, H2, Spacer } from 'tamagui'
 import { useState } from 'react'
-import { login, signInWithGoogle } from './auth-service'
+import { login, signInWithGoogle } from '../../services/auth-service'
+import { useRouter } from 'expo-router' 
 
 export function LoginScreen() {
+  const router = useRouter() // Initialisation du router
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -11,7 +13,6 @@ export function LoginScreen() {
     setLoading(true)
     try {
       await login(email, password)
-      // La redirection sera gérée par l'AuthListener (Middleware)
     } catch (error) {
       console.error('Erreur de connexion:', error)
     } finally {
@@ -45,7 +46,22 @@ export function LoginScreen() {
           onChangeText={setPassword}
         />
         <Button backgroundColor="$blue10" onPress={handleLogin} disabled={loading}>
-          {loading ? 'Chargement...' : 'Se connecter'}
+          <Text color="white">{loading ? 'Chargement...' : 'Se connecter'}</Text>
+        </Button>
+      </YStack>
+
+      <Spacer size="$4" />
+
+      {/* Nouveau bouton pour l'inscription */}
+      <YStack alignItems="center" gap="$2">
+        <Text color="$gray10">Pas encore de compte ?</Text>
+        <Button
+          onPress={() => router.push('/signup')} // Redirection vers la page d'inscription
+          borderWidth={0}
+        >
+          <Text color="$blue10" fontWeight="bold">
+            Créer un compte
+          </Text>
         </Button>
       </YStack>
 

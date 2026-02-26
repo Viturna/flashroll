@@ -1,6 +1,7 @@
 import { useColorScheme } from 'react-native'
 import { TamaguiProvider, type TamaguiProviderProps } from 'tamagui'
 import { config } from '@my/config'
+import { AuthProvider } from './auth'
 
 export function Provider({
   children,
@@ -11,12 +12,8 @@ export function Provider({
   const theme = defaultTheme || (colorScheme === 'dark' ? 'dark' : 'light')
 
   return (
-    <TamaguiProvider
-      config={config}
-      defaultTheme={theme}
-      {...rest}
-    >
-      {children}
+    <TamaguiProvider config={config} defaultTheme={theme} {...rest}>
+      <AuthProvider>{children}</AuthProvider>
     </TamaguiProvider>
   )
 }

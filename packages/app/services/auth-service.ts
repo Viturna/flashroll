@@ -1,4 +1,4 @@
-import { auth, db } from '../../utils/firebase'
+import { auth, db } from '../utils/firebase'
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth'
 import { doc, setDoc, updateDoc } from 'firebase/firestore'
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth'
@@ -13,7 +13,7 @@ export const signUp = async (email, password) => {
     role: 'student',
     isValidated: false,
     createdAt: new Date().toISOString(),
-  }) 
+  })
   return res.user
 }
 
@@ -34,6 +34,9 @@ export const updateProfile = async (data) => {
   })
 }
 
+export const logout = async () => {
+  await auth.signOut()
+}
 export const login = async (email, password) => {
   return await signInWithEmailAndPassword(auth, email, password)
 }
