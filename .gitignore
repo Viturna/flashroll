@@ -28,6 +28,7 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # local env files
+.env
 .env.local
 .env.development.local
 .env.test.local
@@ -48,5 +49,5 @@ thumbs.db
 **/.turbo/*
 
 
-*.env
 apps/next/.env
+apps/expo/.env
