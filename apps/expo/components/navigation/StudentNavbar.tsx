@@ -1,9 +1,8 @@
 import React from 'react'
 import { XStack, Text, Button } from 'tamagui'
-import { Scan, User, BookOpen, FolderOpen } from '@tamagui/lucide-icons'
+import { QrCode, CalendarDays, FileWarning, User } from '@tamagui/lucide-icons'
 import { useRouter, usePathname } from 'expo-router'
 
-// On utilise React.ElementType pour typer les composants d'icônes
 interface NavItemProps {
   icon: React.ElementType
   label: string
@@ -35,15 +34,15 @@ const NavItem = ({ icon: Icon, label, route, isActive, onPress }: NavItemProps) 
   </Button>
 )
 
-export function TeacherNavbar() {
+export function StudentNavbar() {
   const router = useRouter()
   const pathname = usePathname()
 
   const navItems = [
-    { label: 'Scanner', icon: Scan, route: '/(teacher)/' },
-    { label: 'Cours', icon: BookOpen, route: '/(teacher)/courses' },
-    { label: 'Ressources', icon: FolderOpen, route: '/(teacher)/resources' },
-    { label: 'Profil', icon: User, route: '/(teacher)/profile' },
+    { label: 'Scanner', icon: QrCode, route: '/(student)/' },
+    { label: 'Planning', icon: CalendarDays, route: '/(student)/schedule' },
+    { label: 'Absences', icon: FileWarning, route: '/(student)/absences' },
+    { label: 'Profil', icon: User, route: '/(student)/profile' },
   ]
 
   return (

@@ -1,11 +1,32 @@
-import React, { useState, useEffect } from 'react'
-import { YStack, XStack, Text, Button, Input, ScrollView, Sheet, Label, H2, Spinner } from 'tamagui'
-import { Plus, Clock, Users, Calendar as CalendarIcon } from '@tamagui/lucide-icons'
+'use client'
+
+import React, { useState, useEffect, useMemo } from 'react'
+import {
+  YStack,
+  XStack,
+  Text,
+  Button,
+  Input,
+  ScrollView,
+  Sheet,
+  Label,
+  H2,
+  Spinner,
+  Card,
+} from 'tamagui'
+import {
+  Plus,
+  Clock,
+  Users,
+  Calendar as CalendarIcon,
+  ArrowRight,
+  AlertCircle,
+  MapPin,
+} from '@tamagui/lucide-icons'
 import { Calendar, LocaleConfig } from 'react-native-calendars'
 
-// Utilisation des alias du monorepo
 import { db, auth } from 'app/utils/firebase'
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore'
+import { collection, getDocs, doc, getDoc } from 'firebase/firestore'
 import { createAttendanceSession } from 'app/services/session-service'
 
 // Configuration calendrier en français
@@ -51,43 +72,62 @@ export default function CoursesPage() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
 
   const [courses, setCourses] = useState<any[]>([])
-  const [formData, setFormData] = useState({ name: '', group: '', end: '12:00' })
 
-  // 1. Récupération des cours depuis Firebase
+  // NOUVEAU: État étendu pour le formulaire
+  const [formData, setFormData] = useState({
+    name: '',
+    group: '',
+    start: '08:00',
+    end: '10:00',
+    teachersStr: '',
+  })
+
+  const [currentTeacherName, setCurrentTeacherName] = useState('')
+
   const fetchCourses = async () => {
     setFetching(true)
     try {
       const user = auth.currentUser
-      if (!user) {
-        console.log('Aucun utilisateur connecté')
-        return
-      }
+      if (!user) return
 
-      console.log('Récupération des sessions pour :', user.uid)
+      const userDoc = await getDoc(doc(db, 'users', user.uid))
+      const userData = userDoc.data()
+      const fullName = `${userData?.firstName || ''} ${userData?.lastName || ''}`.trim()
 
-      const q = query(
-        collection(db, 'sessions'),
-        where('teacherId', '==', user.uid),
-        orderBy('startTime', 'desc')
-      )
+      // On sauvegarde le nom pour le pré-remplir dans le formulaire plus tard
+      setCurrentTeacherName(fullName)
 
-      const querySnapshot = await getDocs(q)
-      const fetched = querySnapshot.docs.map((doc) => {
-        const data = doc.data()
-        // Sécurité : conversion du Timestamp Firebase en Date JS
-        const dateObj = data.startTime?.toDate ? data.startTime.toDate() : new Date()
-        return {
-          id: doc.id,
-          ...data,
-          dateDisplay: dateObj.toISOString().split('T')[0],
-        }
-      })
+      const querySnapshot = await getDocs(collection(db, 'sessions'))
 
-      console.log(`${fetched.length} sessions trouvées.`)
+      const fetched = querySnapshot.docs
+        .map((docSnap) => {
+          const data = docSnap.data()
+          const dateObj = data.startTime?.toDate
+            ? data.startTime.toDate()
+            : new Date(data.startTime || Date.now())
+          const endDateObj = data.endTime?.toDate
+            ? data.endTime.toDate()
+            : new Date(data.endTime || Date.now())
+
+          return {
+            id: docSnap.id,
+            ...data,
+            startTimeObj: dateObj,
+            endTimeObj: endDateObj,
+            dateDisplay: dateObj.toISOString().split('T')[0],
+          }
+        })
+        .filter((c: any) => {
+          const isManualTeacher = c.teacherId === user.uid
+          const isImportedTeacher =
+            c.teachersNames && Array.isArray(c.teachersNames) && c.teachersNames.includes(fullName)
+          return isManualTeacher || isImportedTeacher
+        })
+        .sort((a, b) => a.startTimeObj.getTime() - b.startTimeObj.getTime())
+
       setCourses(fetched)
     } catch (e: any) {
       console.error('Erreur Firebase Fetch:', e)
-      // Si l'erreur contient "index", c'est qu'il faut créer l'index dans la console Firebase
     } finally {
       setFetching(false)
     }
@@ -97,7 +137,27 @@ export default function CoursesPage() {
     fetchCourses()
   }, [])
 
-  // 2. Création d'une nouvelle session via le service
+  // 2. Déduction du "Prochain Cours"
+  const nextCourse = useMemo(() => {
+    const now = new Date()
+    return courses.find((c) => c.endTimeObj > now)
+  }, [courses])
+
+  // 3. Calcul des dates à marquer sur le calendrier
+  const markedDates = useMemo(() => {
+    const marks: any = {}
+    courses.forEach((c) => {
+      marks[c.dateDisplay] = { marked: true, dotColor: '#007AFF' }
+    })
+    if (marks[selectedDate]) {
+      marks[selectedDate] = { ...marks[selectedDate], selected: true, selectedColor: '#007AFF' }
+    } else {
+      marks[selectedDate] = { selected: true, selectedColor: '#007AFF' }
+    }
+    return marks
+  }, [courses, selectedDate])
+
+  // 4. Création manuelle d'une session
   const handleSaveCourse = async () => {
     const user = auth.currentUser
     if (!user) {
@@ -105,26 +165,43 @@ export default function CoursesPage() {
       return
     }
 
-    if (!formData.name || !formData.group) {
-      alert('Veuillez remplir le nom et le groupe')
+    if (!formData.name || !formData.group || !formData.start || !formData.end) {
+      alert('Veuillez remplir tous les champs obligatoires (Nom, Groupe, Début, Fin)')
       return
     }
 
     setLoading(true)
     try {
-      console.log('Appel service createAttendanceSession...')
+      // Transformation de la chaîne "Prof 1, Prof 2" en tableau ["Prof 1", "Prof 2"]
+      const teachersArray = formData.teachersStr
+        .split(',')
+        .map((t) => t.trim())
+        .filter((t) => t.length > 0)
+
+      // Si le champ est vide, on s'assure qu'au moins le prof actuel est dedans !
+      if (teachersArray.length === 0 && currentTeacherName) {
+        teachersArray.push(currentTeacherName)
+      }
+
       const sessionId = await createAttendanceSession(
         user.uid,
         formData.name,
         formData.group,
-        formData.end
+        formData.start, // On envoie l'heure de début
+        formData.end,
+        teachersArray // On envoie le tableau de profs
       )
 
       if (sessionId) {
-        console.log('Session créée avec ID :', sessionId)
         setShowAddSheet(false)
-        setFormData({ name: '', group: '', end: '12:00' })
-        // Recharger la liste pour voir le nouveau cours
+        // On réinitialise le formulaire (en remettant le nom du prof par défaut)
+        setFormData({
+          name: '',
+          group: '',
+          start: '08:00',
+          end: '10:00',
+          teachersStr: currentTeacherName,
+        })
         await fetchCourses()
       }
     } catch (e: any) {
@@ -134,6 +211,16 @@ export default function CoursesPage() {
       setLoading(false)
     }
   }
+
+  // Quand on ouvre la popup, on s'assure que le champ prof est pré-rempli avec le prof actuel
+  const handleOpenSheet = () => {
+    if (!formData.teachersStr) {
+      setFormData((prev) => ({ ...prev, teachersStr: currentTeacherName }))
+    }
+    setShowAddSheet(true)
+  }
+
+  const coursesOfDay = courses.filter((c) => c.dateDisplay === selectedDate)
 
   return (
     <YStack flex={1} backgroundColor="$background">
@@ -146,11 +233,68 @@ export default function CoursesPage() {
               circular
               size="$4"
               backgroundColor="$blue10"
-              onPress={() => setShowAddSheet(true)}
+              onPress={handleOpenSheet}
             />
           </XStack>
 
-          {/* Calendrier */}
+          {/* --- SECTION : PROCHAIN COURS --- */}
+          {!fetching && nextCourse && (
+            <Card
+              padding="$4"
+              backgroundColor="$blue2"
+              borderWidth={1}
+              borderColor="$blue6"
+              hoverStyle={{ scale: 0.99 }}
+            >
+              <XStack alignItems="center" gap="$2" marginBottom="$2">
+                <AlertCircle size={18} color="$blue10" />
+                <Text fontWeight="bold" color="$blue10">
+                  Ton prochain cours
+                </Text>
+              </XStack>
+
+              <H2 fontSize="$6" fontWeight="bold">
+                {nextCourse.courseName}
+              </H2>
+
+              <XStack gap="$4" marginTop="$2" flexWrap="wrap">
+                <XStack alignItems="center" gap="$1.5">
+                  <Clock size={14} color="$gray11" />
+                  <Text color="$gray11" fontSize="$3">
+                    {nextCourse.startTimeObj.toLocaleTimeString('fr-FR', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}{' '}
+                    -{' '}
+                    {nextCourse.endTimeObj.toLocaleTimeString('fr-FR', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </Text>
+                </XStack>
+                <XStack alignItems="center" gap="$1.5">
+                  <Users size={14} color="$gray11" />
+                  <Text color="$gray11" fontSize="$3">
+                    {nextCourse.groupId}
+                  </Text>
+                </XStack>
+                {nextCourse.room && (
+                  <XStack alignItems="center" gap="$1.5">
+                    <MapPin size={14} color="$gray11" />
+                    <Text color="$gray11" fontSize="$3">
+                      {nextCourse.room}
+                    </Text>
+                  </XStack>
+                )}
+              </XStack>
+
+              <Button theme="blue" marginTop="$3" iconAfter={ArrowRight}>
+                Préparer l'appel
+              </Button>
+            </Card>
+          )}
+
+          {/* --- CALENDRIER --- */}
           <YStack
             borderRadius="$4"
             overflow="hidden"
@@ -160,9 +304,7 @@ export default function CoursesPage() {
           >
             <Calendar
               onDayPress={(day: any) => setSelectedDate(day.dateString)}
-              markedDates={{
-                [selectedDate]: { selected: true, selectedColor: '#007AFF' },
-              }}
+              markedDates={markedDates}
               theme={{
                 todayTextColor: '#007AFF',
                 selectedDayBackgroundColor: '#007AFF',
@@ -175,39 +317,60 @@ export default function CoursesPage() {
             Cours du {selectedDate}
           </Text>
 
+          {/* --- LISTE DES COURS DU JOUR --- */}
           {fetching ? (
-            <YStack padding="$8" ai="center">
+            <YStack padding="$8" alignItems="center">
               <Spinner size="large" color="$blue10" />
             </YStack>
           ) : (
             <YStack gap="$3">
-              {courses.filter((c) => c.dateDisplay === selectedDate).length > 0 ? (
-                courses
-                  .filter((c) => c.dateDisplay === selectedDate)
-                  .map((course) => (
-                    <YStack
-                      key={course.id}
-                      padding="$4"
-                      backgroundColor="$backgroundHover"
-                      borderRadius="$4"
-                      borderWidth={1}
-                      borderColor="$borderColor"
-                    >
-                      <H2 fontSize="$6" fontWeight="bold">
-                        {course.courseName}
-                      </H2>
-                      <XStack gap="$4" marginTop="$2">
-                        <XStack alignItems="center" gap="$1">
-                          <Users size={14} color="$gray10" />
-                          <Text color="$gray10">{course.groupId}</Text>
-                        </XStack>
-                        <XStack alignItems="center" gap="$1">
-                          <Clock size={14} color="$gray10" />
-                          <Text color="$gray10">Fin: {course.endTime}</Text>
-                        </XStack>
+              {coursesOfDay.length > 0 ? (
+                coursesOfDay.map((course) => (
+                  <YStack
+                    key={course.id}
+                    padding="$4"
+                    backgroundColor="$backgroundHover"
+                    borderRadius="$4"
+                    borderWidth={1}
+                    borderColor="$borderColor"
+                  >
+                    <H2 fontSize="$6" fontWeight="bold">
+                      {course.courseName}
+                    </H2>
+                    <XStack gap="$4" marginTop="$2" flexWrap="wrap">
+                      <XStack alignItems="center" gap="$1">
+                        <Clock size={14} color="$gray10" />
+                        <Text color="$gray10">
+                          {course.startTimeObj.toLocaleTimeString('fr-FR', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}{' '}
+                          -{' '}
+                          {course.endTimeObj.toLocaleTimeString('fr-FR', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </Text>
                       </XStack>
-                    </YStack>
-                  ))
+                      <XStack alignItems="center" gap="$1">
+                        <Users size={14} color="$gray10" />
+                        <Text color="$gray10">{course.groupId}</Text>
+                      </XStack>
+                    </XStack>
+
+                    {/* Affichage des professeurs assignés */}
+                    {course.teachersNames && course.teachersNames.length > 0 && (
+                      <XStack gap="$1" marginTop="$2" flexWrap="wrap">
+                        <Text color="$gray10" fontSize="$2" fontWeight="bold">
+                          Profs :
+                        </Text>
+                        <Text color="$gray10" fontSize="$2">
+                          {course.teachersNames.join(', ')}
+                        </Text>
+                      </XStack>
+                    )}
+                  </YStack>
+                ))
               ) : (
                 <YStack
                   padding="$8"
@@ -227,19 +390,19 @@ export default function CoursesPage() {
         </YStack>
       </ScrollView>
 
-      {/* Formulaire d'ajout */}
+      {/* --- FORMULAIRE D'AJOUT MANUEL --- */}
       <Sheet
         modal
         open={showAddSheet}
         onOpenChange={setShowAddSheet}
-        snapPoints={[75]}
+        snapPoints={[85]}
         dismissOnSnapToBottom
       >
         <Sheet.Overlay />
         <Sheet.Frame padding="$4">
           <Sheet.Handle />
           <YStack gap="$4" marginTop="$4">
-            <H2>Démarrer une session</H2>
+            <H2>Créer une session</H2>
 
             <YStack gap="$1">
               <Label>Nom du cours</Label>
@@ -260,17 +423,42 @@ export default function CoursesPage() {
             </YStack>
 
             <YStack gap="$1">
-              <Label>Heure de fin prévue</Label>
+              <Label>Professeurs (séparés par une virgule)</Label>
               <Input
-                placeholder="12:00"
-                value={formData.end}
-                onChangeText={(t) => setFormData({ ...formData, end: t })}
+                placeholder="ex: Jean Dupont, Marie Curie"
+                value={formData.teachersStr}
+                onChangeText={(t) => setFormData({ ...formData, teachersStr: t })}
               />
             </YStack>
 
-            <Button backgroundColor="$blue10" onPress={handleSaveCourse} disabled={loading}>
+            <XStack gap="$4">
+              <YStack gap="$1" flex={1}>
+                <Label>Heure de début</Label>
+                <Input
+                  placeholder="08:00"
+                  value={formData.start}
+                  onChangeText={(t) => setFormData({ ...formData, start: t })}
+                />
+              </YStack>
+
+              <YStack gap="$1" flex={1}>
+                <Label>Heure de fin</Label>
+                <Input
+                  placeholder="10:00"
+                  value={formData.end}
+                  onChangeText={(t) => setFormData({ ...formData, end: t })}
+                />
+              </YStack>
+            </XStack>
+
+            <Button
+              backgroundColor="$blue10"
+              marginTop="$4"
+              onPress={handleSaveCourse}
+              disabled={loading}
+            >
               <Text color="white" fontWeight="bold">
-                {loading ? 'Création...' : 'Lancer la session (Générer QR)'}
+                {loading ? 'Création...' : 'Créer et planifier'}
               </Text>
             </Button>
           </YStack>

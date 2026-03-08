@@ -17,7 +17,7 @@ export default function Index() {
       // Redirection par rôle une fois validé
       switch (userData.role) {
         case 'admin':
-          router.replace('/(admin)')
+          router.replace('/(student)')
           break
         case 'teacher':
           router.replace('/(teacher)')
@@ -31,5 +31,5 @@ export default function Index() {
     }
   }, [user, userData, isLoading])
 
-  return null 
+  return null
 }

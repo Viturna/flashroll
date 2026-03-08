@@ -9,6 +9,8 @@ import { onAuthStateChanged, User } from 'firebase/auth'
 
 import { db, auth } from 'app/utils/firebase'
 
+import { SafeAreaProvider } from 'react-native-safe-area-context'
+
 export const unstable_settings = {
   initialRouteName: 'index',
 }
@@ -41,7 +43,7 @@ export default function App() {
     }
   }, [interLoaded, interError, authInitialized])
 
-  //  Système d'attente et redirection selon Firestore
+  // Système d'attente et redirection selon Firestore
   useEffect(() => {
     if (!user) return
 
@@ -80,10 +82,12 @@ function RootLayoutNav() {
   const colorScheme = useColorScheme()
 
   return (
-    <Provider>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <Stack screenOptions={{ headerShown: false }} />
-      </ThemeProvider>
-    </Provider>
+    <SafeAreaProvider>
+      <Provider>
+        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+          <Stack screenOptions={{ headerShown: false }} />
+        </ThemeProvider>
+      </Provider>
+    </SafeAreaProvider>
   )
 }

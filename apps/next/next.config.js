@@ -12,6 +12,7 @@ module.exports = {
     'expo-linking',
     'expo-constants',
     'expo-modules-core',
+    'app',
   ],
   experimental: {
     scrollRestoration: true,

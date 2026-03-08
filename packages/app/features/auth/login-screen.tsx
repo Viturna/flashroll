@@ -1,13 +1,17 @@
-import { Button, Input, YStack, Text, H2, Spacer } from 'tamagui'
+import { Button, Input, YStack, Text, H2, Spacer, Spinner } from 'tamagui'
 import { useState } from 'react'
+import { useRouter } from 'expo-router'
 import { login, signInWithGoogle } from '../../services/auth-service'
-import { useRouter } from 'expo-router' 
+// Hook google
+import { useGoogleAuth } from '../../hooks/useGoogleAuth'
 
 export function LoginScreen() {
-  const router = useRouter() // Initialisation du router
+  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+
+  // const { loginWithGoogle, isLoading: loadingGoogle, isReady } = useGoogleAuth()
 
   const handleLogin = async () => {
     setLoading(true)
@@ -28,7 +32,7 @@ export function LoginScreen() {
       padding="$4"
       backgroundColor="$background"
     >
-      <H2>Connexion 🔐</H2>
+      <H2>Connexion</H2>
       <Spacer size="$4" />
 
       <YStack gap="$2" width="100%" maxWidth={300}>
@@ -52,13 +56,9 @@ export function LoginScreen() {
 
       <Spacer size="$4" />
 
-      {/* Nouveau bouton pour l'inscription */}
       <YStack alignItems="center" gap="$2">
         <Text color="$gray10">Pas encore de compte ?</Text>
-        <Button
-          onPress={() => router.push('/signup')} // Redirection vers la page d'inscription
-          borderWidth={0}
-        >
+        <Button onPress={() => router.push('/signup')} borderWidth={0}>
           <Text color="$blue10" fontWeight="bold">
             Créer un compte
           </Text>
@@ -69,10 +69,16 @@ export function LoginScreen() {
       <Text color="$gray10">— OU —</Text>
       <Spacer size="$4" />
 
-      <YStack gap="$2" width="100%" maxWidth={300}>
-        <Button onPress={() => signInWithGoogle()}>Connexion avec Google</Button>
+      {/* <YStack gap="$2" width="100%" maxWidth={300}>
+        <Button
+          onPress={loginWithGoogle}
+          disabled={!isReady || loadingGoogle}
+          icon={loadingGoogle ? <Spinner /> : undefined}
+        >
+          {loadingGoogle ? 'Connexion en cours...' : 'Connexion avec Google'}
+        </Button>
         <Button>Connexion avec Apple</Button>
-      </YStack>
+      </YStack> */}
     </YStack>
   )
 }

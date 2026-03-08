@@ -45,6 +45,8 @@
     "@tamagui/react-native-web-lite": "^2.0.0-rc.0",
     "check-dependency-version-consistency": "^4.1.0",
     "expo": "^54",
+    "expo-auth-session": "~7.0.10",
+    "expo-crypto": "~15.0.8",
     "expo-dev-client": "~6.0.20",
     "husky": "^9.1.6",
     "react-native-qrcode-svg": "^6.3.21",
