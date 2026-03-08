@@ -1,6 +1,6 @@
 # Flash Roll
 
-Flash Roll est une solution moderne de gestion d'appels et de présences destinée aux établissements scolaires. Elle permet aux enseignants de générer des QR codes dynamiques anti-triche et aux étudiants de valider leur présence instantanément via leur smartphone.
+Flash Roll est une solution moderne de gestion d'appels et de présences destinée aux établissements scolaires. Elle permet aux enseignants de générer des QR codes dynamiques et aux étudiants de valider leur présence instantanément via leur smartphone.
 
 ## Technologies utilisées
 
